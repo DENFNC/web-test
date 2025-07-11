@@ -1,16 +1,7 @@
-version: '3.8'
-
 services:
   app:
     build: .
     container_name: websrv-app
-    environment:
-      - DB_HOST=postgres
-      - DB_PORT=5432
-      - DB_USER=webuser
-      - DB_PASSWORD=webpass
-      - DB_NAME=websrv
-      - REDIS_ADDR=redis:6379
     depends_on:
       - postgres
       - redis
@@ -19,24 +10,33 @@ services:
     restart: unless-stopped
 
   postgres:
-    image: postgres:15
-    container_name: websrv-postgres
+    image: postgres:17.5-alpine3.22
+    container_name: postgres
     environment:
-      POSTGRES_USER: webuser
-      POSTGRES_PASSWORD: webpass
-      POSTGRES_DB: websrv
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=admin
+      - POSTGRES_DB=service
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    networks:
+      - service
     restart: unless-stopped
 
   redis:
     image: redis:7
-    container_name: websrv-redis
+    container_name: redis
     ports:
       - "6379:6379"
+    networks:
+      - service
     restart: unless-stopped
 
 volumes:
   pgdata:
+
+networks:
+  service:
+    driver: bridge
+    name: service

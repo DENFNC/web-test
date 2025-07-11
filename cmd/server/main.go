@@ -1,44 +1,41 @@
 package main
 
 import (
-	"context"
-	"log"
-	"net/http"
+	"log/slog"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/DENFNC/web-test/config"
-	"github.com/DENFNC/web-test/internal/repository"
-	"github.com/DENFNC/web-test/internal/service"
-	"github.com/DENFNC/web-test/internal/transport"
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/DENFNC/web-test/internal/app"
 )
 
 func main() {
-	cfg := config.Load()
+	logger := initLogger()
+	cfg := config.LoadConfig(logger, "./.env.example")
 
-	// --- PostgreSQL ---
-	pgDsn := "postgres://" + cfg.DBUser + ":" + cfg.DBPass + "@" + cfg.DBHost + ":" + cfg.DBPort + "/" + cfg.DBName + "?sslmode=disable"
-	pgpool, err := pgxpool.New(context.Background(), pgDsn)
-	if err != nil {
-		log.Fatalf("Ошибка подключения к PostgreSQL: %v", err)
-	}
-	if err := pgpool.Ping(context.Background()); err != nil {
-		log.Fatalf("PostgreSQL не отвечает: %v", err)
-	}
+	application := app.NewApp(logger, cfg)
+	go application.MustStart()
 
-	// --- Redis ---
-	redisCache := repository.NewRedisCache(cfg.RedisAddr)
+	sigCh := make(chan os.Signal, 1)
 
-	// --- Репозиторий ---
-	repo := repository.NewPsqlRepo(pgpool)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+	sig := <-sigCh
 
-	adminToken := os.Getenv("ADMIN_TOKEN")
-	if adminToken == "" {
-		adminToken = "superadmin123"
-	}
-	userSvc := service.NewUserService(repo, adminToken)
-	docSvc := service.NewDocumentService(repo)
-	server := transport.NewServerWithCache(repo, docSvc, userSvc, redisCache)
-	log.Println("Сервер запущен на :8080 (PostgreSQL, Redis)")
-	http.ListenAndServe(":8080", server)
+	logger.Info(
+		"Calling program termination",
+		slog.String("signal", sig.String()),
+	)
+}
+
+func initLogger() *slog.Logger {
+	logger := slog.New(
+		slog.NewTextHandler(
+			os.Stdout,
+			&slog.HandlerOptions{},
+		),
+	)
+	slog.SetDefault(logger)
+
+	return logger
 }
