@@ -10,8 +10,10 @@ type Response struct {
 }
 
 type ErrorResponse struct {
-	Code int    `json:"code"`
-	Text string `json:"text"`
+	Error struct {
+		Code int    `json:"code"`
+		Text string `json:"text"`
+	} `json:"error"`
 }
 
 func JSON(w http.ResponseWriter, status int, payload any) {
@@ -39,11 +41,14 @@ func JSON(w http.ResponseWriter, status int, payload any) {
 }
 
 func Error(w http.ResponseWriter, status int, message string) {
-	resp := ErrorResponse{
-		Code: status,
-		Text: message,
-	}
-	JSON(w, status, resp)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+
+	resp := ErrorResponse{}
+	resp.Error.Code = status
+	resp.Error.Text = message
+
+	_ = json.NewEncoder(w).Encode(resp)
 }
 
 func toJSON(v any) (json.RawMessage, error) {

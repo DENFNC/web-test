@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"path/filepath"
 
 	"github.com/DENFNC/web-test/internal/domain"
 	"github.com/DENFNC/web-test/internal/infra/psql/repository"
@@ -30,18 +31,24 @@ func (s *DocumentService) FindUserIDByLogin(ctx context.Context, login string) (
 	return s.AuthRepo.GetUserIDByLogin(ctx, login)
 }
 
-func (s *DocumentService) SaveDocument(ctx context.Context, meta request.DocumentMetaRequest, ownerID string) (string, error) {
+func (s *DocumentService) SaveDocument(ctx context.Context, meta request.DocumentMetaRequest, ownerID string, originalName string) (string, string, error) {
 	id := uuid.New()
+	ext := filepath.Ext(originalName)
+	uuidFileName := uuid.New().String() + ext
 
 	doc := &domain.Document{
 		ID:       id.String(),
-		FileName: meta.Name,
+		FileName: uuidFileName,
 		MimeType: meta.Mime,
 		HasFile:  true,
 		IsPublic: meta.Public,
 		OwnerID:  ownerID,
 	}
-	return s.DocRepo.SaveDocument(ctx, doc)
+	newID, err := s.DocRepo.SaveDocument(ctx, doc)
+	if err != nil {
+		return "", "", err
+	}
+	return newID, uuidFileName, nil
 }
 
 func (s *DocumentService) AddDocumentAccess(ctx context.Context, documentID string, userIDs []string) error {
@@ -62,4 +69,16 @@ func (s *DocumentService) ParseOptionalJSON(jsonStr string) (map[string]interfac
 		return nil, err
 	}
 	return data, nil
+}
+
+func (s *DocumentService) GetDocumentByID(ctx context.Context, id string) (*domain.Document, error) {
+	return s.DocRepo.GetDocumentByID(ctx, id)
+}
+
+func (s *DocumentService) HasDocumentAccess(ctx context.Context, documentID, userID string) (bool, error) {
+	return s.DocRepo.HasDocumentAccess(ctx, documentID, userID)
+}
+
+func (s *DocumentService) DeleteDocument(ctx context.Context, id string) error {
+	return s.DocRepo.DeleteDocument(ctx, id)
 }

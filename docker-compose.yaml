@@ -5,9 +5,19 @@ services:
     depends_on:
       - postgres
       - redis
+    environment:
+      - DATABASE_URL=postgres://admin:admin@postgres:5432/service?sslmode=disable
+      - DATABASE_MAX_CONNS=25
+      - DATABASE_MIN_CONNS=5
+      - DATABASE_MAX_CONN_LIFE_TIME=30m
+      - DATABASE_MAX_CONN_IDLE_TIME=5m
+      - DATABASE_HEALTH_CHECK_PERIOD=1m
+      - APP_URL=:8080
     ports:
       - "8080:8080"
     restart: unless-stopped
+    networks:
+      - service
 
   postgres:
     image: postgres:17.5-alpine3.22
@@ -35,6 +45,7 @@ services:
 
 volumes:
   pgdata:
+
 
 networks:
   service:

@@ -12,6 +12,7 @@ import (
 type AuthRepository interface {
 	GetByID(ctx context.Context, id string) (*domain.UserCredentials, error)
 	SaveUser(ctx context.Context, user *domain.User) (string, error)
+	RevokeToken(ctx context.Context, token string) error
 }
 
 type AuthService struct {
@@ -67,6 +68,10 @@ func (srv *AuthService) LoginUser(ctx context.Context, user *domain.User) (strin
 	}
 
 	return data.Token, nil
+}
+
+func (srv *AuthService) RevokeToken(ctx context.Context, token string) error {
+	return srv.repo.RevokeToken(ctx, token)
 }
 
 func HashPassword(password string) (string, error) {

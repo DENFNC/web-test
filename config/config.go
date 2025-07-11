@@ -36,8 +36,8 @@ func LoadConfig(log *slog.Logger, path string) *Config {
 
 	if _, err := os.Stat(path); err != nil {
 		if os.IsNotExist(err) {
-			log.Error(
-				"File not found",
+			log.Warn(
+				"File not found, skipping .env load",
 				slog.String("path", path),
 			)
 		} else {
@@ -46,15 +46,13 @@ func LoadConfig(log *slog.Logger, path string) *Config {
 				slog.String("err", err.Error()),
 			)
 		}
-		panic(err)
-	}
-
-	if err := godotenv.Load(path); err != nil {
-		log.Error(
-			"Error reading file",
-			slog.String("err", err.Error()),
-		)
-		panic(err)
+	} else {
+		if err := godotenv.Load(path); err != nil {
+			log.Error(
+				"Error reading file",
+				slog.String("err", err.Error()),
+			)
+		}
 	}
 
 	var cfg Config

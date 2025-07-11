@@ -3,7 +3,6 @@ package handler
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log/slog"
 	"net/http"
 
@@ -16,6 +15,7 @@ import (
 type AuthService interface {
 	CreateUser(ctx context.Context, user *domain.User) (string, error)
 	LoginUser(ctx context.Context, user *domain.User) (string, error)
+	RevokeToken(ctx context.Context, token string) error
 }
 
 type AuthHandler struct {
@@ -71,7 +71,6 @@ func (api *AuthHandler) auth(w http.ResponseWriter, r *http.Request) {
 
 	token, err := api.AuthService.LoginUser(r.Context(), &user)
 	if err != nil {
-		fmt.Println(err)
 		response.Error(w, http.StatusUnauthorized, "Login failed")
 		return
 	}
@@ -80,7 +79,23 @@ func (api *AuthHandler) auth(w http.ResponseWriter, r *http.Request) {
 }
 
 func (api *AuthHandler) exit(w http.ResponseWriter, r *http.Request) {
-	// TODO: Реализовать логику
+	token := r.PathValue("token")
+	if token == "" {
+		response.Error(w, http.StatusBadRequest, "missing token")
+		return
+	}
+
+	err := api.AuthService.RevokeToken(r.Context(), token)
+	if err != nil {
+		response.Error(w, http.StatusInternalServerError, "cannot revoke token")
+		return
+	}
+
+	response.JSON(w, http.StatusOK, map[string]any{
+		"response": map[string]bool{
+			token: true,
+		},
+	})
 }
 
 func decodeAndValidate[T any](w http.ResponseWriter, r *http.Request, dst *T) bool {

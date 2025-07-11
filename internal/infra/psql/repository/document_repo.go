@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 
 	"github.com/DENFNC/web-test/internal/domain"
@@ -61,6 +62,70 @@ func (repo *DocumentRepository) AddDocumentAccess(ctx context.Context, documentI
 	stmt, args, err := repo.DialectWrapper.
 		Insert("document_access").
 		Rows(goqu.Record{"document_id": documentID, "user_id": userID}).
+		Prepared(true).
+		ToSQL()
+	if err != nil {
+		return err
+	}
+	_, err = repo.Pool.Exec(ctx, stmt, args...)
+	return err
+}
+
+func (repo *DocumentRepository) GetDocumentByID(ctx context.Context, id string) (*domain.Document, error) {
+	stmt, args, err := repo.DialectWrapper.
+		Select("id", "file_name", "mime_type", "has_file", "is_public", "owner_id", "created_at").
+		From("documents").
+		Where(goqu.Ex{"id": id}).
+		Prepared(true).
+		ToSQL()
+	if err != nil {
+		return nil, err
+	}
+	row := repo.Pool.QueryRow(ctx, stmt, args...)
+	var mdlDoc models.Document
+	if err := row.Scan(
+		&mdlDoc.ID,
+		&mdlDoc.FileName,
+		&mdlDoc.MimeType,
+		&mdlDoc.HasFile,
+		&mdlDoc.IsPublic,
+		&mdlDoc.OwnerID,
+		&mdlDoc.CreatedAt,
+	); err != nil {
+		return nil, err
+	}
+
+	var doc domain.Document
+	if err := mapping.MapStructModelToDomain(&mdlDoc, &doc); err != nil {
+		fmt.Println(err)
+		return nil, err
+	}
+	return &doc, nil
+}
+
+func (repo *DocumentRepository) HasDocumentAccess(ctx context.Context, documentID, userID string) (bool, error) {
+	stmt, args, err := repo.DialectWrapper.
+		Select("1").
+		From("document_access").
+		Where(goqu.Ex{"document_id": documentID, "user_id": userID}).
+		Limit(1).
+		Prepared(true).
+		ToSQL()
+	if err != nil {
+		return false, err
+	}
+	row := repo.Pool.QueryRow(ctx, stmt, args...)
+	var dummy int
+	if err := row.Scan(&dummy); err != nil {
+		return false, nil
+	}
+	return true, nil
+}
+
+func (repo *DocumentRepository) DeleteDocument(ctx context.Context, id string) error {
+	stmt, args, err := repo.DialectWrapper.
+		Delete("documents").
+		Where(goqu.Ex{"id": id}).
 		Prepared(true).
 		ToSQL()
 	if err != nil {

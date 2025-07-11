@@ -117,6 +117,42 @@ func (repo *AuthRepository) SaveUser(ctx context.Context, user *domain.User) (st
 	return login, nil
 }
 
+func (repo *AuthRepository) GetUserIDByToken(ctx context.Context, token string) (string, error) {
+	stmt, args, err := repo.DialectWrapper.
+		Select("user_id").
+		From("auth_tokens").
+		Where(goqu.Ex{"token": token, "is_revoked": false}).
+		Prepared(true).
+		ToSQL()
+	if err != nil {
+		return "", err
+	}
+	row := repo.Pool.QueryRow(ctx, stmt, args...)
+	var userID string
+	if err := row.Scan(&userID); err != nil {
+		return "", err
+	}
+	return userID, nil
+}
+
+func (repo *AuthRepository) GetUserIDByLogin(ctx context.Context, login string) (string, error) {
+	stmt, args, err := repo.DialectWrapper.
+		Select("id").
+		From("users").
+		Where(goqu.Ex{"login": login}).
+		Prepared(true).
+		ToSQL()
+	if err != nil {
+		return "", err
+	}
+	row := repo.Pool.QueryRow(ctx, stmt, args...)
+	var userID string
+	if err := row.Scan(&userID); err != nil {
+		return "", err
+	}
+	return userID, nil
+}
+
 func (repo *AuthRepository) insertUser(ctx context.Context, tx pgx.Tx, user *models.User) (string, error) {
 	stmt, args, err := repo.DialectWrapper.
 		Insert("users").
@@ -158,38 +194,16 @@ func generateToken(n int) (string, error) {
 	return base64.URLEncoding.EncodeToString(b), nil
 }
 
-func (repo *AuthRepository) GetUserIDByToken(ctx context.Context, token string) (string, error) {
+func (repo *AuthRepository) RevokeToken(ctx context.Context, token string) error {
 	stmt, args, err := repo.DialectWrapper.
-		Select("user_id").
-		From("auth_tokens").
+		Update("auth_tokens").
+		Set(goqu.Record{"is_revoked": true}).
 		Where(goqu.Ex{"token": token, "is_revoked": false}).
 		Prepared(true).
 		ToSQL()
 	if err != nil {
-		return "", err
+		return err
 	}
-	row := repo.Pool.QueryRow(ctx, stmt, args...)
-	var userID string
-	if err := row.Scan(&userID); err != nil {
-		return "", err
-	}
-	return userID, nil
-}
-
-func (repo *AuthRepository) GetUserIDByLogin(ctx context.Context, login string) (string, error) {
-	stmt, args, err := repo.DialectWrapper.
-		Select("id").
-		From("users").
-		Where(goqu.Ex{"login": login}).
-		Prepared(true).
-		ToSQL()
-	if err != nil {
-		return "", err
-	}
-	row := repo.Pool.QueryRow(ctx, stmt, args...)
-	var userID string
-	if err := row.Scan(&userID); err != nil {
-		return "", err
-	}
-	return userID, nil
+	_, err = repo.Pool.Exec(ctx, stmt, args...)
+	return err
 }

@@ -176,12 +176,14 @@ func MapStruct(src, dst any) error {
 }
 
 func validateSrc(src any) (reflect.Value, error) {
-	srcVal := reflect.Indirect(reflect.ValueOf(src))
-	if srcVal.Kind() != reflect.Struct {
-		return srcVal, errors.New("src must be a struct or pointer to struct")
+	rv := reflect.ValueOf(src)
+	if rv.Kind() == reflect.Ptr {
+		rv = rv.Elem()
 	}
-
-	return srcVal, nil
+	if rv.Kind() != reflect.Struct {
+		return rv, errors.New("src must be a struct or pointer to struct")
+	}
+	return rv, nil
 }
 
 func validateDst(dst any) (reflect.Value, error) {
